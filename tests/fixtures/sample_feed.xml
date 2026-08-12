@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Kitco News</title>
+    <link>https://www.kitco.com</link>
+    <description>Sample feed for tests</description>
+    <item>
+      <title>Gold prices surge as Fed signals rate cuts amid CPI miss</title>
+      <link>https://www.kitco.com/news/gold-surge-fed-rate-cuts?utm_source=rss</link>
+      <description>Gold climbed after the Fed hinted at rate cuts following a softer than expected CPI report.</description>
+      <pubDate>Mon, 01 Jan 2026 12:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Local bakery wins regional pastry award</title>
+      <link>https://www.kitco.com/news/bakery-award</link>
+      <description>A small bakery took home the top prize at the regional pastry competition.</description>
+      <pubDate>Mon, 01 Jan 2026 11:00:00 GMT</pubDate>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,17 @@
+# Environment
+.env
+venv/
+.venv/
+
+# Python
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+
+# Data
+data/*.db
+data/*.db-*
+
+# OS
+.DS_Store
