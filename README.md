@@ -52,7 +52,7 @@ box.
 |---|---|---|
 | `ANALYZER_PROVIDER` | `gemini` | Which LLM backend to use: `gemini` or `claude` |
 | `GEMINI_API_KEY` | *(required if provider=gemini)* | Your Gemini API key |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model used for impact analysis |
+| `GEMINI_MODEL` | `gemini-flash-latest` | Gemini model used for impact analysis. A rolling alias, not a dated model — Google occasionally sunsets specific dated models (e.g. `gemini-2.5-flash` can 404 for new API keys even though it's still listed by `client.models.list()`); `run list_gemini_models.py` to see what your key can actually call if you want to pin a specific version instead |
 | `ANTHROPIC_API_KEY` | *(required if provider=claude)* | Your Anthropic API key |
 | `CLAUDE_MODEL` | `claude-sonnet-5` | Claude model used for impact analysis |
 | `POLL_INTERVAL_MINUTES` | `5` | Seconds between poll cycles, in minutes |
@@ -102,7 +102,7 @@ runs the same suite on every push/PR to `main` — no secrets required.
 The keyword prefilter is the primary cost control — most fetched items never
 reach the LLM. Both backends run as bounded, low-effort classification calls:
 Claude uses `effort: "low"` with thinking disabled; Gemini uses
-`gemini-2.5-flash` with `thinking_budget: 0`. Claude's system prompt is also
+`gemini-flash-latest` with `thinking_budget: 0`. Claude's system prompt is also
 cached (`cache_control: ephemeral`) so repeated calls within the cache TTL are
 cheaper — Gemini has an equivalent context-caching feature that isn't wired
 up yet (see Roadmap).

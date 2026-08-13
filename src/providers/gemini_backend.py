@@ -19,7 +19,7 @@ _BLOCKED_FINISH_REASONS = {"SAFETY", "PROHIBITED_CONTENT", "RECITATION", "BLOCKL
 
 
 class GeminiBackend(AnalyzerBackend):
-    def __init__(self, client: Optional[genai.Client] = None, model: str = "gemini-2.5-flash"):
+    def __init__(self, client: Optional[genai.Client] = None, model: str = "gemini-flash-latest"):
         self.client = client or genai.Client()
         self.model = model
 
