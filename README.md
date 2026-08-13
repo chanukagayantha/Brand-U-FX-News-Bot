@@ -1,10 +1,11 @@
 # Brand-U-FX-News-Bot
 
 A near-real-time gold market (XAU/USD) news bot. It polls financial RSS feeds
-and an economic calendar feed, filters for gold-relevant items, uses Claude to
-analyze each item's likely market impact, and stores short trader-facing
-summaries. There is no distribution channel yet — this is the extraction and
-analysis pipeline that a future Telegram/email layer will read from.
+and an economic calendar feed, filters for gold-relevant items, uses an LLM
+(Gemini or Claude, configurable) to analyze each item's likely market impact,
+and stores short trader-facing summaries. There is no distribution channel
+yet — this is the extraction and analysis pipeline that a future
+Telegram/email layer will read from.
 
 ## Architecture
 
@@ -12,7 +13,7 @@ analysis pipeline that a future Telegram/email layer will read from.
 fetch (RSS + economic calendar)
   -> dedupe against SQLite (URL for news, pending/released status for calendar events)
   -> cheap keyword prefilter (cuts LLM calls by an estimated 85-95%)
-  -> Claude analysis (relevance, direction, impact level, short summary)
+  -> LLM analysis (relevance, direction, impact level, short summary) via Gemini or Claude
   -> store in SQLite
   -> print/log a formatted summary for anything relevant
 ```
@@ -31,7 +32,8 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# edit .env and set ANTHROPIC_API_KEY
+# edit .env: set ANALYZER_PROVIDER (defaults to "gemini") and the matching API key
+# (GEMINI_API_KEY for gemini, ANTHROPIC_API_KEY for claude)
 ```
 
 For development (adds pytest):
@@ -42,13 +44,17 @@ pip install -r requirements-dev.txt
 
 ## Configuration
 
-All variables are optional except `ANTHROPIC_API_KEY`; everything else has a
-built-in default so the bot runs out of the box.
+`ANALYZER_PROVIDER` picks the LLM backend; only the matching API key is
+required. Everything else has a built-in default so the bot runs out of the
+box.
 
 | Variable | Default | Description |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | *(required)* | Your Anthropic API key |
-| `ANALYZER_MODEL` | `claude-sonnet-5` | Claude model used for impact analysis |
+| `ANALYZER_PROVIDER` | `gemini` | Which LLM backend to use: `gemini` or `claude` |
+| `GEMINI_API_KEY` | *(required if provider=gemini)* | Your Gemini API key |
+| `GEMINI_MODEL` | `gemini-2.5-flash` | Gemini model used for impact analysis |
+| `ANTHROPIC_API_KEY` | *(required if provider=claude)* | Your Anthropic API key |
+| `CLAUDE_MODEL` | `claude-sonnet-5` | Claude model used for impact analysis |
 | `POLL_INTERVAL_MINUTES` | `5` | Seconds between poll cycles, in minutes |
 | `RSS_FEEDS` | Kitco, FXStreet, Investing.com, ForexLive, MarketWatch | Comma-separated RSS feed URLs |
 | `CALENDAR_URL` | Forex Factory weekly calendar JSON | Economic calendar feed URL |
@@ -84,23 +90,29 @@ sqlite3 data/gold_news.db "SELECT title, direction, impact_level, summary FROM n
 pytest
 ```
 
-All tests run without a live `ANTHROPIC_API_KEY` or network access — HTTP
-calls are mocked against local fixtures, and the Claude client is fully
-mocked in `tests/test_analyzer.py`.
+All tests run without a live API key or network access — HTTP calls are
+mocked against local fixtures, and both provider clients are fully mocked in
+`tests/test_claude_backend.py` and `tests/test_gemini_backend.py` (the
+provider-agnostic logic in `src/analyzer.py` is tested separately in
+`tests/test_analyzer.py` against a fake backend). CI (`.github/workflows/tests.yml`)
+runs the same suite on every push/PR to `main` — no secrets required.
 
 ## Cost notes
 
 The keyword prefilter is the primary cost control — most fetched items never
-reach the LLM. Analysis calls use `claude-sonnet-5` with `effort: "low"` and
-thinking disabled (a bounded classification task), and the system prompt is
+reach the LLM. Both backends run as bounded, low-effort classification calls:
+Claude uses `effort: "low"` with thinking disabled; Gemini uses
+`gemini-2.5-flash` with `thinking_budget: 0`. Claude's system prompt is also
 cached (`cache_control: ephemeral`) so repeated calls within the cache TTL are
-cheap.
+cheaper — Gemini has an equivalent context-caching feature that isn't wired
+up yet (see Roadmap).
 
 ## Roadmap
 
 - Distribution layer (Telegram bot, email digest) consuming
   `Storage.get_unsent_analyses()` and the shared formatting functions in
   `src/output.py`.
+- Gemini context caching, to match Claude's prompt-caching cost savings.
 
 ## Disclaimer
 

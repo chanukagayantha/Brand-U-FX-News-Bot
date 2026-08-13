@@ -1,4 +1,4 @@
-"""Claude-powered gold market impact analysis for news items and calendar events."""
+"""Provider-agnostic gold market impact analysis: builds prompts, calls a backend, parses JSON."""
 
 from __future__ import annotations
 
@@ -6,9 +6,8 @@ import json
 import logging
 from typing import Optional
 
-import anthropic
-
 from src.models import AnalysisResult, CalendarEvent, NewsItem
+from src.providers.base import AnalyzerBackend
 
 logger = logging.getLogger(__name__)
 
@@ -74,9 +73,8 @@ crisis escalation, large inflation surprises). Most routine headlines are "low" 
 
 
 class GoldNewsAnalyzer:
-    def __init__(self, client: Optional[anthropic.Anthropic] = None, model: str = "claude-sonnet-5"):
-        self.client = client or anthropic.Anthropic()
-        self.model = model
+    def __init__(self, backend: AnalyzerBackend):
+        self.backend = backend
 
     def analyze_news_item(self, item: NewsItem) -> Optional[AnalysisResult]:
         summary = (item.summary or "")[:_MAX_SUMMARY_CHARS]
@@ -103,50 +101,14 @@ class GoldNewsAnalyzer:
         return self._run(user_content)
 
     def _run(self, user_content: str) -> Optional[AnalysisResult]:
-        try:
-            response = self.client.messages.create(
-                model=self.model,
-                max_tokens=700,
-                thinking={"type": "disabled"},
-                output_config={
-                    "effort": "low",
-                    "format": {"type": "json_schema", "schema": ANALYSIS_SCHEMA},
-                },
-                system=[
-                    {
-                        "type": "text",
-                        "text": SYSTEM_PROMPT,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
-                messages=[{"role": "user", "content": user_content}],
-            )
-        except anthropic.RateLimitError as exc:
-            logger.warning("Rate limited by Claude API: %s", exc)
-            return None
-        except anthropic.APIConnectionError as exc:
-            logger.warning("Connection error calling Claude API: %s", exc)
-            return None
-        except anthropic.APIStatusError as exc:
-            logger.warning("Claude API error (%s): %s", exc.status_code, exc.message)
-            return None
-
-        if response.stop_reason == "refusal":
-            logger.warning("Claude refused to analyze this item")
-            return None
-        if response.stop_reason == "max_tokens":
-            logger.warning("Claude response truncated at max_tokens")
-            return None
-
-        text_block = next((b for b in response.content if b.type == "text"), None)
-        if text_block is None:
-            logger.warning("Claude response had no text block")
+        raw_text = self.backend.generate(SYSTEM_PROMPT, user_content, ANALYSIS_SCHEMA)
+        if raw_text is None:
             return None
 
         try:
-            data = json.loads(text_block.text)
+            data = json.loads(raw_text)
         except json.JSONDecodeError as exc:
-            logger.warning("Failed to parse Claude response as JSON: %s", exc)
+            logger.warning("Failed to parse backend response as JSON: %s", exc)
             return None
 
         return AnalysisResult(
@@ -156,6 +118,6 @@ class GoldNewsAnalyzer:
             confidence=data["confidence"],
             summary=data["summary"],
             reasoning=data["reasoning"],
-            model=self.model,
-            raw_response=text_block.text,
+            model=self.backend.model,
+            raw_response=raw_text,
         )

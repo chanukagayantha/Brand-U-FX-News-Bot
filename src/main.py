@@ -6,11 +6,10 @@ import argparse
 import logging
 import sys
 
-import anthropic
-
 from src.analyzer import GoldNewsAnalyzer
 from src.config import Config
 from src.pipeline import Pipeline
+from src.providers.factory import create_backend
 from src.storage import Storage
 
 
@@ -38,15 +37,27 @@ def main(argv=None) -> int:
     )
     logger = logging.getLogger("main")
 
-    if not config.anthropic_api_key:
+    if config.analyzer_provider not in ("claude", "gemini"):
         logger.error(
-            "ANTHROPIC_API_KEY is not set. Copy .env.example to .env and add your key."
+            "Unknown ANALYZER_PROVIDER=%r (expected 'claude' or 'gemini')",
+            config.analyzer_provider,
+        )
+        return 1
+    if config.analyzer_provider == "claude" and not config.anthropic_api_key:
+        logger.error(
+            "ANALYZER_PROVIDER=claude but ANTHROPIC_API_KEY is not set. "
+            "Copy .env.example to .env and add your key."
+        )
+        return 1
+    if config.analyzer_provider == "gemini" and not config.gemini_api_key:
+        logger.error(
+            "ANALYZER_PROVIDER=gemini but GEMINI_API_KEY is not set. "
+            "Copy .env.example to .env and add your key."
         )
         return 1
 
     storage = Storage(config.db_path)
-    client = anthropic.Anthropic(api_key=config.anthropic_api_key)
-    analyzer = GoldNewsAnalyzer(client=client, model=config.model)
+    analyzer = GoldNewsAnalyzer(backend=create_backend(config))
     pipeline = Pipeline(config, storage, analyzer)
 
     if args.once:
